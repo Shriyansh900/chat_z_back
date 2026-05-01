@@ -1,0 +1,33 @@
+{
+  "name": "chat_z_backend",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/Shriyansh900/chat_z_backend#readme",
+  "bugs": {
+    "url": "https://github.com/Shriyansh900/chat_z_backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Shriyansh900/chat_z_backend.git"
+  },
+  "license": "ISC",
+  "author": "shriyansh",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.6.1",
+    "multer": "^2.1.1",
+    "nodemon": "^3.1.14"
+  }
+}
