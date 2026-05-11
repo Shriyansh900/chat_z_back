@@ -35,6 +35,7 @@ export const getUserChats = async (req, res) => {
   try {
     const chats = await Chat.find({ users: req.user.id })
       .populate('users', '-password')
+      .populate('lastMessage')
       .sort({ updatedAt: -1 });
 
     res.json(chats);
