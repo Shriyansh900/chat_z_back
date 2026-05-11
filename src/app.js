@@ -13,8 +13,8 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || '*',
-    credentials: true, // required for cookies to be sent cross-origin
+    origin: true, // reflect request origin — allows any origin while still supporting credentials
+    credentials: true,
   }),
 );
 app.use(express.json());
