@@ -1,10 +1,30 @@
 import multer from 'multer';
+import path from 'path';
+
+const ALLOWED_TYPES = /jpeg|jpg|png|gif|webp|pdf|doc|docx|mp4|mp3/;
+const MAX_SIZE_MB = 10;
 
 const storage = multer.diskStorage({
   destination: './src/uploads',
   filename: (_req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, Date.now() + '-' + file.fieldname + ext);
   },
 });
 
-export const upload = multer({ storage });
+const fileFilter = (_req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+  const mime = file.mimetype;
+
+  if (ALLOWED_TYPES.test(ext) || ALLOWED_TYPES.test(mime)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`File type not allowed: ${ext}`), false);
+  }
+};
+
+export const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: MAX_SIZE_MB * 1024 * 1024 },
+});

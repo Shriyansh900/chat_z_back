@@ -35,8 +35,10 @@ export const sendMessage = async (req, res) => {
     message = await message.populate('sender', 'username avatar');
     message = await message.populate('chat');
 
-    // Touch the chat's updatedAt so chats sort by latest message
-    await Chat.findByIdAndUpdate(chatId, { updatedAt: new Date() });
+    // Update chat's lastMessage and touch updatedAt for sorting
+    await Chat.findByIdAndUpdate(chatId, {
+      $set: { lastMessage: message._id, updatedAt: new Date() },
+    });
 
     res.status(201).json(message);
   } catch (error) {
