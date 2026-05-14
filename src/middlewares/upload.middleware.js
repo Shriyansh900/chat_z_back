@@ -4,13 +4,9 @@ import path from 'path';
 const ALLOWED_TYPES = /jpeg|jpg|png|gif|webp|pdf|doc|docx|mp4|mp3/;
 const MAX_SIZE_MB = 10;
 
-const storage = multer.diskStorage({
-  destination: './src/uploads',
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, Date.now() + '-' + file.fieldname + ext);
-  },
-});
+// Use memoryStorage — files are kept as Buffer in req.file.buffer
+// and uploaded directly to Cloudinary (no local disk writes)
+const storage = multer.memoryStorage();
 
 const fileFilter = (_req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
