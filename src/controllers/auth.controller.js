@@ -65,6 +65,7 @@ export const signup = async (req, res) => {
 
     // Send OTP FIRST — only save to DB if it succeeds
     // This way a failed email never leaves a stale OTP or orphaned data
+    const otp = generateOtp();
     await sendOtpEmail(email, otp, 'signup');
 
     await Otp.deleteMany({ email, purpose: 'signup' });

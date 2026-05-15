@@ -15,8 +15,10 @@ const getTransporter = () => {
       service: 'gmail',
       auth: {
         user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS, // Gmail App Password — not your login password
+        pass: process.env.MAIL_PASS,
       },
+      // Force IPv4 — Render free tier has no IPv6 outbound connectivity
+      family: 4,
     });
   }
   return _transporter;
