@@ -32,6 +32,8 @@ const setRefreshCookie = (res, token) => {
 
 // ─── SIGNUP ──────────────────────────────────────────────────────────────────
 // POST /api/auth/signup
+// Step 1: validate → upload avatar → send OTP → store pending data in OTP record
+// User is NOT created yet — only created after OTP is verified
 export const signup = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -40,14 +42,16 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
+    // Check duplicates before doing anything else
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
       return res.status(409).json({ message: 'User already exists' });
     }
 
     const hashed = await hashPassword(password);
-    const userData = { username, email, password: hashed };
 
+    // Upload avatar to Cloudinary if provided
+    const pendingUser = { username, hashedPassword: hashed };
     if (req.file) {
       const result = await uploadToCloudinary(req.file.buffer, {
         folder: 'chatz/avatars',
@@ -55,29 +59,39 @@ export const signup = async (req, res) => {
           { width: 300, height: 300, crop: 'fill', gravity: 'face' },
         ],
       });
-      userData.avatar = result.secure_url;
-      userData.avatarPublicId = result.public_id;
+      pendingUser.avatar = result.secure_url;
+      pendingUser.avatarPublicId = result.public_id;
     }
 
-    const user = await User.create(userData);
-
-    const otp = generateOtp();
-    await Otp.deleteMany({ email, purpose: 'signup' });
-    await Otp.create({ email, otp, purpose: 'signup' });
+    // Send OTP FIRST — only save to DB if it succeeds
+    // This way a failed email never leaves a stale OTP or orphaned data
     await sendOtpEmail(email, otp, 'signup');
 
+    await Otp.deleteMany({ email, purpose: 'signup' });
+    await Otp.create({ email, otp, purpose: 'signup', pendingUser });
+
     res.status(201).json({
-      message: 'Account created. Please verify your email with the OTP sent.',
-      userId: user._id,
+      message:
+        'OTP sent to your email. Please verify to complete registration.',
     });
   } catch (error) {
     console.error(error);
+    if (
+      error.message?.includes('MAIL_USER') ||
+      error.code === 'EAUTH' ||
+      error.responseCode >= 500
+    ) {
+      return res
+        .status(503)
+        .json({ message: 'Failed to send OTP email. Please try again.' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 // ─── VERIFY SIGNUP OTP ───────────────────────────────────────────────────────
 // POST /api/auth/verify-signup
+// Step 2: verify OTP → create user → return tokens
 export const verifySignupOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -91,11 +105,27 @@ export const verifySignupOtp = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    const user = await User.findOneAndUpdate(
-      { email },
-      { isVerified: true },
-      { new: true },
-    );
+    // Check if user was already created (edge case: double submit)
+    const alreadyExists = await User.findOne({ email });
+    if (alreadyExists) {
+      await Otp.deleteMany({ email, purpose: 'signup' });
+      return res
+        .status(409)
+        .json({ message: 'User already exists. Please login.' });
+    }
+
+    // Create user now using the pending data stored in the OTP record
+    const { username, hashedPassword, avatar, avatarPublicId } =
+      record.pendingUser;
+
+    const user = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      avatar: avatar || '',
+      avatarPublicId: avatarPublicId || null,
+      isVerified: true,
+    });
 
     await Otp.deleteMany({ email, purpose: 'signup' });
 
@@ -109,7 +139,7 @@ export const verifySignupOtp = async (req, res) => {
     });
 
     setRefreshCookie(res, refreshToken);
-    res.json({ accessToken, user: sanitizeUser(user) });
+    res.status(201).json({ accessToken, user: sanitizeUser(user) });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -134,23 +164,58 @@ export const resendOtp = async (req, res) => {
         .json({ message: "purpose must be 'signup' or 'login'" });
     }
 
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (purpose === 'login') {
+      // For login resend, user must exist
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ message: 'User not found' });
+    } else {
+      // For signup resend, pending OTP record must exist (user not created yet)
+      const pending = await Otp.findOne({ email, purpose: 'signup' });
+      if (!pending) {
+        return res.status(404).json({
+          message:
+            'No pending signup found for this email. Please signup again.',
+        });
+      }
+    }
 
     const otp = generateOtp();
-    await Otp.deleteMany({ email, purpose });
-    await Otp.create({ email, otp, purpose });
+
+    // Read existing record BEFORE deleting (to preserve pendingUser for signup)
+    const existingRecord = await Otp.findOne({ email, purpose });
+
+    // Send email first — only update DB if it succeeds
     await sendOtpEmail(email, otp, purpose);
+
+    await Otp.deleteMany({ email, purpose });
+    await Otp.create({
+      email,
+      otp,
+      purpose,
+      pendingUser:
+        purpose === 'signup' ? existingRecord?.pendingUser : undefined,
+    });
 
     res.json({ message: 'OTP resent successfully' });
   } catch (error) {
     console.error(error);
+    if (
+      error.message?.includes('MAIL_USER') ||
+      error.code === 'EAUTH' ||
+      error.responseCode >= 500
+    ) {
+      return res
+        .status(503)
+        .json({ message: 'Failed to send OTP email. Please try again.' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 // ─── LOGIN ───────────────────────────────────────────────────────────────────
 // POST /api/auth/login
+// Step 1: verify credentials → send OTP
+// OTP is only saved AFTER email is sent successfully — safe to retry
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -159,35 +224,36 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Must explicitly select password since it has select: false
     const user = await User.findOne({ email }).select('+password');
     if (!user) return res.status(400).json({ message: 'User not found' });
 
     const isMatch = comparePassword(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid password' });
 
-    if (!user.isVerified) {
-      const otp = generateOtp();
-      await Otp.deleteMany({ email, purpose: 'signup' });
-      await Otp.create({ email, otp, purpose: 'signup' });
-      await sendOtpEmail(email, otp, 'signup');
-      return res.status(403).json({
-        message: 'Email not verified. A new OTP has been sent to your email.',
-        userId: user._id,
-      });
-    }
-
     const otp = generateOtp();
+
+    // Send email FIRST — only save to DB if it succeeds
+    // This way a failed email never leaves a stale OTP in the DB
+    await sendOtpEmail(email, otp, 'login');
+
     await Otp.deleteMany({ email, purpose: 'login' });
     await Otp.create({ email, otp, purpose: 'login' });
-    await sendOtpEmail(email, otp, 'login');
 
     res.json({
       message: 'OTP sent to your email. Please verify to complete login.',
-      userId: user._id,
     });
   } catch (error) {
     console.error(error);
+    // Distinguish email failure from other errors
+    if (
+      error.message?.includes('MAIL_USER') ||
+      error.code === 'EAUTH' ||
+      error.responseCode >= 500
+    ) {
+      return res
+        .status(503)
+        .json({ message: 'Failed to send OTP email. Please try again.' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };

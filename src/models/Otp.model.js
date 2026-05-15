@@ -8,6 +8,16 @@ const otpSchema = new mongoose.Schema({
     enum: ['signup', 'login'],
     required: true,
   },
+
+  // Pending signup data — stored here until OTP is verified
+  // Only used for purpose === 'signup'
+  pendingUser: {
+    username: { type: String },
+    hashedPassword: { type: String },
+    avatar: { type: String },
+    avatarPublicId: { type: String },
+  },
+
   // MongoDB TTL index — auto deletes document after 10 minutes
   expiresAt: {
     type: Date,
