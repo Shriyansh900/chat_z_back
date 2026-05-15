@@ -7,20 +7,25 @@ import {
   uploadToCloudinary,
   deleteFromCloudinary,
 } from '../utils/uploadToCloudinary.js';
+
+// Escape special regex characters to prevent injection
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // ─── SEARCH USERS ────────────────────────────────────────────────────────────
 // GET /api/users/search?search=<query>
 export const searchUsers = async (req, res) => {
   try {
     const keyword = req.query.search;
 
-    if (!keyword) {
+    if (!keyword || keyword.trim().length < 1) {
       return res.status(400).json({ message: 'Search query is required' });
     }
 
     const users = await User.find({
-      _id: { $ne: req.user.id }, // exclude self
-      username: { $regex: keyword, $options: 'i' },
-    }).select('-password');
+      _id: { $ne: req.user.id },
+      blockedUsers: { $nin: [req.user.id] }, // don't show users who blocked you
+      username: { $regex: escapeRegex(keyword.trim()), $options: 'i' },
+    }).select('-password -blockedUsers');
 
     res.json(users);
   } catch (error) {
@@ -42,36 +47,56 @@ export const getProfile = async (req, res) => {
   }
 };
 
+// ─── GET USER BY ID ──────────────────────────────────────────────────────────
+// GET /api/users/:userId
+export const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select(
+      '-password -avatarPublicId',
+    );
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Don't expose profile to someone they've blocked
+    if (user.blockedUsers?.map(String).includes(req.user.id)) {
+      return res.status(403).json({ message: 'User not found' });
+    }
+
+    // Strip blockedUsers from response
+    const userObj = user.toObject();
+    delete userObj.blockedUsers;
+
+    res.json(userObj);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // ─── UPDATE PROFILE ──────────────────────────────────────────────────────────
 // PUT /api/users/me
-// Accepts multipart/form-data for avatar upload
-// body fields: username (optional), bio (optional)
-// file field:  avatar (optional)
 export const updateProfile = async (req, res) => {
   try {
     const { username, bio } = req.body;
     const updates = {};
 
     if (username) {
-      // Check username not taken by someone else
       const taken = await User.findOne({ username, _id: { $ne: req.user.id } });
       if (taken) {
         return res.status(409).json({ message: 'Username already taken' });
       }
-      updates.username = username;
+      updates.username = username.trim();
     }
 
     if (bio !== undefined) updates.bio = bio;
 
     if (req.file) {
-      // Delete old avatar from Cloudinary if it exists
       const existing = await User.findById(req.user.id).select(
         'avatarPublicId',
       );
       if (existing?.avatarPublicId) {
         await deleteFromCloudinary(existing.avatarPublicId);
       }
-
       const result = await uploadToCloudinary(req.file.buffer, {
         folder: 'chatz/avatars',
         transformation: [
@@ -100,19 +125,16 @@ export const deleteProfile = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Delete avatar from Cloudinary
     if (user.avatarPublicId) {
       await deleteFromCloudinary(user.avatarPublicId);
     }
 
-    // Clean up all related data
     await Promise.all([
       RefreshToken.deleteMany({ user: req.user.id }),
       FriendRequest.deleteMany({
         $or: [{ sender: req.user.id }, { receiver: req.user.id }],
       }),
       Message.deleteMany({ sender: req.user.id }),
-      // Remove user from all chats
       Chat.updateMany(
         { users: req.user.id },
         { $pull: { users: req.user.id } },
@@ -120,7 +142,6 @@ export const deleteProfile = async (req, res) => {
       User.findByIdAndDelete(req.user.id),
     ]);
 
-    // Clear refresh cookie
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -134,10 +155,62 @@ export const deleteProfile = async (req, res) => {
   }
 };
 
+// ─── BLOCK USER ──────────────────────────────────────────────────────────────
+// POST /api/users/:userId/block
+export const blockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (userId === req.user.id) {
+      return res.status(400).json({ message: 'Cannot block yourself' });
+    }
+
+    const target = await User.findById(userId);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $addToSet: { blockedUsers: userId },
+    });
+
+    res.json({ message: 'User blocked' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── UNBLOCK USER ────────────────────────────────────────────────────────────
+// DELETE /api/users/:userId/block
+export const unblockUser = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: { blockedUsers: req.params.userId },
+    });
+
+    res.json({ message: 'User unblocked' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── GET BLOCKED USERS ───────────────────────────────────────────────────────
+// GET /api/users/me/blocked
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .select('blockedUsers')
+      .populate('blockedUsers', 'username avatar');
+
+    res.json(user.blockedUsers);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // ─── UPLOAD PUBLIC KEY ───────────────────────────────────────────────────────
 // POST /api/users/me/public-key
-// body: { publicKey } — JWK string generated by Web Crypto API on the client
-// Called once after login/signup when the client generates its key pair
 export const uploadPublicKey = async (req, res) => {
   try {
     const { publicKey } = req.body;
@@ -146,7 +219,6 @@ export const uploadPublicKey = async (req, res) => {
       return res.status(400).json({ message: 'publicKey is required' });
     }
 
-    // Basic validation — must be a valid JSON string (JWK format)
     try {
       const parsed = JSON.parse(publicKey);
       if (parsed.kty !== 'RSA' && parsed.kty !== 'EC') {
@@ -161,7 +233,6 @@ export const uploadPublicKey = async (req, res) => {
     }
 
     await User.findByIdAndUpdate(req.user.id, { publicKey });
-
     res.json({ message: 'Public key registered' });
   } catch (error) {
     console.error(error);
@@ -171,7 +242,6 @@ export const uploadPublicKey = async (req, res) => {
 
 // ─── GET USER PUBLIC KEY ─────────────────────────────────────────────────────
 // GET /api/users/:userId/public-key
-// Used by sender to encrypt a message for a specific recipient
 export const getPublicKey = async (req, res) => {
   try {
     const user = await User.findById(req.params.userId).select(

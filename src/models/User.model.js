@@ -10,14 +10,14 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    password: { type: String, required: true },
+    password: { type: String, required: true, select: false }, // never returned by default
     avatar: { type: String, default: '' },
-    avatarPublicId: { type: String, default: null }, // Cloudinary public_id for deletion
+    avatarPublicId: { type: String, default: null },
     bio: { type: String, default: '', maxlength: 200 },
     isVerified: { type: Boolean, default: false },
-
-    // E2E Encryption — public key stored as JWK (JSON Web Key) string
-    // Private key NEVER leaves the client device
+    isOnline: { type: Boolean, default: false },
+    lastSeen: { type: Date, default: null },
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     publicKey: { type: String, default: null },
   },
   { timestamps: true },
