@@ -1,0 +1,605 @@
+{
+  "info": {
+    "name": "ChatZ API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://chat-z-back.onrender.com/api" },
+    { "key": "accessToken", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "chatId", "value": "" },
+    { "key": "friendRequestId", "value": "" },
+    { "key": "groupId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "signup"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "username", "value": "testuser", "type": "text" },
+                { "key": "email", "value": "test@example.com", "type": "text" },
+                { "key": "password", "value": "password123", "type": "text" },
+                { "key": "avatar", "type": "file", "src": "" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.userId) pm.environment.set('userId', res.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Signup OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-signup"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('userId', res.user._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify Login OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"123456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "  pm.collectionVariables.set('userId', res.user._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "body": { "mode": "raw", "raw": "" }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) pm.collectionVariables.set('accessToken', res.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            },
+            "body": { "mode": "raw", "raw": "" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/search?search=test",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "search"],
+              "query": [{ "key": "search", "value": "test" }]
+            }
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "username", "value": "newusername", "type": "text" },
+                { "key": "bio", "value": "Hey there!", "type": "text" },
+                { "key": "avatar", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            }
+          }
+        },
+        {
+          "name": "Upload Public Key (E2E)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/public-key",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "public-key"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publicKey\": \"{\\\"kty\\\":\\\"RSA\\\",\\\"alg\\\":\\\"RSA-OAEP-256\\\",\\\"n\\\":\\\"samplebase64\\\",\\\"e\\\":\\\"AQAB\\\",\\\"key_ops\\\":[\\\"encrypt\\\"],\\\"ext\\\":true}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get User Public Key (E2E)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/public-key",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "public-key"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chats",
+      "item": [
+        {
+          "name": "Access or Create Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chats",
+              "host": ["{{baseUrl}}"],
+              "path": ["chats"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('chatId', res._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chats",
+              "host": ["{{baseUrl}}"],
+              "path": ["chats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Send Message (Text)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"content\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\",\n  \"senderContent\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Send Message (File)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "chatId", "value": "{{chatId}}", "type": "text" },
+                {
+                  "key": "content",
+                  "value": "dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==",
+                  "type": "text"
+                },
+                {
+                  "key": "senderContent",
+                  "value": "dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==",
+                  "type": "text"
+                },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send Group Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"senderContent\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\",\n  \"groupEncrypted\": [\n    { \"userId\": \"MEMBER_1_ID\", \"encryptedContent\": \"dGVzdA==\" },\n    { \"userId\": \"MEMBER_2_ID\", \"encryptedContent\": \"dGVzdA==\" }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{chatId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "{{chatId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Friends",
+      "item": [
+        {
+          "name": "Send Friend Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/friends/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["friends", "request"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": \"{{userId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('friendRequestId', res._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Pending Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/friends/requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["friends", "requests"]
+            }
+          }
+        },
+        {
+          "name": "Accept Friend Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/friends/request/{{friendRequestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["friends", "request", "{{friendRequestId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"accept\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reject Friend Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/friends/request/{{friendRequestId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["friends", "request", "{{friendRequestId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reject\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get All Friends",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/friends",
+              "host": ["{{baseUrl}}"],
+              "path": ["friends"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "Create Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Group\",\n  \"description\": \"A test group\",\n  \"members\": [\"MEMBER_ID_1\", \"MEMBER_ID_2\"]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('groupId', res._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups"]
+            }
+          }
+        },
+        {
+          "name": "Get Group by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}"]
+            }
+          }
+        },
+        {
+          "name": "Add Members to Group",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/members",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "members"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIds\": [\"NEW_MEMBER_ID\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "Remove Member from Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/members/MEMBER_ID",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "members", "MEMBER_ID"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

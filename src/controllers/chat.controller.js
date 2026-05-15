@@ -1,13 +1,29 @@
 import Chat from '../models/Chat.model.js';
+import FriendRequest from '../models/FriendRequest.model.js';
 
 // POST /api/chats
-// Create or fetch a 1-on-1 chat between logged-in user and another user
+// Create or fetch a 1-on-1 chat — only allowed between accepted friends
 export const accessChat = async (req, res) => {
   try {
     const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: 'userId is required' });
+    }
+
+    // Check accepted friendship exists between the two users
+    const friendship = await FriendRequest.findOne({
+      $or: [
+        { sender: req.user.id, receiver: userId },
+        { sender: userId, receiver: req.user.id },
+      ],
+      status: 'accepted',
+    });
+
+    if (!friendship) {
+      return res
+        .status(403)
+        .json({ message: 'You can only chat with accepted friends' });
     }
 
     // Check if a 1-on-1 chat already exists

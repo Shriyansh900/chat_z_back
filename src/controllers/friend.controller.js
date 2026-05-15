@@ -107,3 +107,26 @@ export const getFriends = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// DELETE /api/friends/:userId
+// Remove an accepted friend
+export const unfriend = async (req, res) => {
+  try {
+    const result = await FriendRequest.findOneAndDelete({
+      $or: [
+        { sender: req.user.id, receiver: req.params.userId },
+        { sender: req.params.userId, receiver: req.user.id },
+      ],
+      status: 'accepted',
+    });
+
+    if (!result) {
+      return res.status(404).json({ message: 'Friendship not found' });
+    }
+
+    res.json({ message: 'Friend removed' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

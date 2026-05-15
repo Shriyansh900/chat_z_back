@@ -138,3 +138,96 @@ export const removeMember = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// DELETE /api/groups/:id/leave
+// Leave a group (non-admin members only)
+export const leaveGroup = async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    if (!group.members.map(String).includes(req.user.id)) {
+      return res
+        .status(400)
+        .json({ message: 'You are not a member of this group' });
+    }
+
+    if (String(group.admin) === req.user.id) {
+      return res.status(400).json({
+        message:
+          'Admin cannot leave. Transfer admin role first or delete the group.',
+      });
+    }
+
+    group.members = group.members.filter((m) => String(m) !== req.user.id);
+    await group.save();
+
+    await Chat.findByIdAndUpdate(group.chat, { $pull: { users: req.user.id } });
+
+    res.json({ message: 'Left the group' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// PUT /api/groups/:id/admin
+// Transfer admin role to another member (current admin only)
+export const changeAdmin = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' });
+    }
+
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    if (String(group.admin) !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: 'Only admin can transfer admin role' });
+    }
+
+    if (!group.members.map(String).includes(userId)) {
+      return res
+        .status(400)
+        .json({ message: 'New admin must be a member of the group' });
+    }
+
+    group.admin = userId;
+    await group.save();
+
+    await group.populate('admin members', 'username avatar');
+    res.json(group);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// DELETE /api/groups/:id
+// Delete a group entirely (admin only)
+export const deleteGroup = async (req, res) => {
+  try {
+    const group = await Group.findById(req.params.id);
+    if (!group) return res.status(404).json({ message: 'Group not found' });
+
+    if (String(group.admin) !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: 'Only admin can delete the group' });
+    }
+
+    await Promise.all([
+      Chat.findByIdAndDelete(group.chat),
+      Group.findByIdAndDelete(req.params.id),
+    ]);
+
+    res.json({ message: 'Group deleted' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
