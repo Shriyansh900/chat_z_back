@@ -32,7 +32,6 @@ const setRefreshCookie = (res, token) => {
 
 // ─── SIGNUP ──────────────────────────────────────────────────────────────────
 // POST /api/auth/signup
-// Accepts multipart/form-data for avatar upload
 export const signup = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -47,8 +46,8 @@ export const signup = async (req, res) => {
     }
 
     const hashed = await hashPassword(password);
-
     const userData = { username, email, password: hashed };
+
     if (req.file) {
       const result = await uploadToCloudinary(req.file.buffer, {
         folder: 'chatz/avatars',
@@ -62,9 +61,8 @@ export const signup = async (req, res) => {
 
     const user = await User.create(userData);
 
-    // Send OTP for email verification
     const otp = generateOtp();
-    await Otp.deleteMany({ email, purpose: 'signup' }); // clear old OTPs
+    await Otp.deleteMany({ email, purpose: 'signup' });
     await Otp.create({ email, otp, purpose: 'signup' });
     await sendOtpEmail(email, otp, 'signup');
 
@@ -80,7 +78,6 @@ export const signup = async (req, res) => {
 
 // ─── VERIFY SIGNUP OTP ───────────────────────────────────────────────────────
 // POST /api/auth/verify-signup
-// body: { email, otp }
 export const verifySignupOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -112,8 +109,40 @@ export const verifySignupOtp = async (req, res) => {
     });
 
     setRefreshCookie(res, refreshToken);
-
     res.json({ accessToken, user: sanitizeUser(user) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ─── RESEND OTP ──────────────────────────────────────────────────────────────
+// POST /api/auth/resend-otp
+export const resendOtp = async (req, res) => {
+  try {
+    const { email, purpose } = req.body;
+
+    if (!email || !purpose) {
+      return res
+        .status(400)
+        .json({ message: 'email and purpose are required' });
+    }
+
+    if (!['signup', 'login'].includes(purpose)) {
+      return res
+        .status(400)
+        .json({ message: "purpose must be 'signup' or 'login'" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const otp = generateOtp();
+    await Otp.deleteMany({ email, purpose });
+    await Otp.create({ email, otp, purpose });
+    await sendOtpEmail(email, otp, purpose);
+
+    res.json({ message: 'OTP resent successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -122,7 +151,6 @@ export const verifySignupOtp = async (req, res) => {
 
 // ─── LOGIN ───────────────────────────────────────────────────────────────────
 // POST /api/auth/login
-// body: { email, password }
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -131,14 +159,14 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    const user = await User.findOne({ email });
+    // Must explicitly select password since it has select: false
+    const user = await User.findOne({ email }).select('+password');
     if (!user) return res.status(400).json({ message: 'User not found' });
 
     const isMatch = comparePassword(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid password' });
 
     if (!user.isVerified) {
-      // Resend OTP if user hasn't verified yet
       const otp = generateOtp();
       await Otp.deleteMany({ email, purpose: 'signup' });
       await Otp.create({ email, otp, purpose: 'signup' });
@@ -149,7 +177,6 @@ export const login = async (req, res) => {
       });
     }
 
-    // Send login OTP
     const otp = generateOtp();
     await Otp.deleteMany({ email, purpose: 'login' });
     await Otp.create({ email, otp, purpose: 'login' });
@@ -167,7 +194,6 @@ export const login = async (req, res) => {
 
 // ─── VERIFY LOGIN OTP ────────────────────────────────────────────────────────
 // POST /api/auth/verify-login
-// body: { email, otp }
 export const verifyLoginOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -197,7 +223,6 @@ export const verifyLoginOtp = async (req, res) => {
     });
 
     setRefreshCookie(res, refreshToken);
-
     res.json({ accessToken, user: sanitizeUser(user) });
   } catch (error) {
     console.error(error);
@@ -244,7 +269,7 @@ export const refresh = async (req, res) => {
 };
 
 // ─── LOGOUT ──────────────────────────────────────────────────────────────────
-// POST /api/auth/logout  (protected)
+// POST /api/auth/logout
 export const logout = async (req, res) => {
   try {
     const token = req.cookies?.refreshToken;

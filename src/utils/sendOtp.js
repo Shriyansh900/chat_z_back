@@ -1,12 +1,26 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS, // Gmail App Password (not your login password)
-  },
-});
+// Lazy-initialize transporter so env vars are read after dotenv.config() runs
+let _transporter = null;
+
+const getTransporter = () => {
+  if (!_transporter) {
+    if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+      throw new Error(
+        'MAIL_USER and MAIL_PASS environment variables are required',
+      );
+    }
+
+    _transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS, // Gmail App Password — not your login password
+      },
+    });
+  }
+  return _transporter;
+};
 
 /**
  * Generate a 6-digit OTP string
@@ -24,7 +38,7 @@ export const sendOtpEmail = async (to, otp, purpose) => {
   const subject =
     purpose === 'signup' ? 'Verify your ChatZ account' : 'Your ChatZ login OTP';
 
-  await transporter.sendMail({
+  await getTransporter().sendMail({
     from: `"ChatZ" <${process.env.MAIL_USER}>`,
     to,
     subject,
