@@ -10,10 +10,10 @@ const SALT_ROUNDS = 10;
 export const hashPassword = (password) => bcrypt.hash(password, SALT_ROUNDS);
 
 /**
- * Compare a plain-text password against a hash.
+ * Compare a plain-text password against a hash (async — non-blocking).
  * @param {string} password
  * @param {string} hash
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
 export const comparePassword = (password, hash) =>
-  bcrypt.compareSync(password, hash);
+  bcrypt.compare(password, hash);

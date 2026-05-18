@@ -6,7 +6,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from '../utils/generateToken.js';
-import { generateOtp, sendOtpEmail } from '../utils/sendOtp.js';
+import { generateOtp } from '../utils/generateOtp.js';
 import { uploadToCloudinary } from '../utils/uploadToCloudinary.js';
 import jwt from 'jsonwebtoken';
 
@@ -32,7 +32,7 @@ const setRefreshCookie = (res, token) => {
 
 // ─── SIGNUP ──────────────────────────────────────────────────────────────────
 // POST /api/auth/signup
-// Step 1: validate → upload avatar → send OTP → store pending data
+// Validates, uploads avatar, generates OTP, returns OTP in response
 // User is NOT created until OTP is verified
 export const signup = async (req, res) => {
   try {
@@ -63,30 +63,23 @@ export const signup = async (req, res) => {
 
     const otp = generateOtp();
 
-    // Send email FIRST — only save to DB if it succeeds
-    await sendOtpEmail(email, otp, 'signup');
-
     await Otp.deleteMany({ email, purpose: 'signup' });
     await Otp.create({ email, otp, purpose: 'signup', pendingUser });
 
     res.status(201).json({
-      message:
-        'OTP sent to your email. Please verify to complete registration.',
+      message: 'OTP generated. Please verify to complete registration.',
+      otp, // show in frontend via react-hot-toast
     });
   } catch (error) {
-    console.error('[SIGNUP ERROR]', error.message, error.code || '');
-    if (error.isEmailError) {
-      return res
-        .status(503)
-        .json({ message: 'Failed to send OTP email. Please try again.' });
-    }
+    console.error('[SIGNUP ERROR]', error.message);
     res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
 // ─── VERIFY SIGNUP OTP ───────────────────────────────────────────────────────
 // POST /api/auth/verify-signup
-// Step 2: verify OTP → create user → return tokens
+// body: { email, otp }
+// Creates user and returns tokens
 export const verifySignupOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -102,9 +95,9 @@ export const verifySignupOtp = async (req, res) => {
 
     if (!record.pendingUser || !record.pendingUser.hashedPassword) {
       await Otp.deleteMany({ email, purpose: 'signup' });
-      return res.status(400).json({
-        message: 'Signup session expired. Please sign up again.',
-      });
+      return res
+        .status(400)
+        .json({ message: 'Signup session expired. Please sign up again.' });
     }
 
     // Edge case: double submit
@@ -149,6 +142,8 @@ export const verifySignupOtp = async (req, res) => {
 
 // ─── RESEND OTP ──────────────────────────────────────────────────────────────
 // POST /api/auth/resend-otp
+// body: { email, purpose: "signup" | "login" }
+// Returns new OTP in response
 export const resendOtp = async (req, res) => {
   try {
     const { email, purpose } = req.body;
@@ -166,16 +161,13 @@ export const resendOtp = async (req, res) => {
     }
 
     if (purpose === 'login') {
-      // For login: user must exist in DB
       const user = await User.findOne({ email });
       if (!user) return res.status(404).json({ message: 'User not found' });
     }
 
-    // Read existing record BEFORE deleting (preserves pendingUser for signup)
     const existingRecord = await Otp.findOne({ email, purpose });
 
     if (purpose === 'signup') {
-      // For signup: pending OTP record must exist (user not in DB yet)
       if (!existingRecord || !existingRecord.pendingUser?.hashedPassword) {
         return res.status(404).json({
           message:
@@ -186,9 +178,6 @@ export const resendOtp = async (req, res) => {
 
     const otp = generateOtp();
 
-    // Send email first — only update DB if it succeeds
-    await sendOtpEmail(email, otp, purpose);
-
     await Otp.deleteMany({ email, purpose });
     await Otp.create({
       email,
@@ -198,21 +187,16 @@ export const resendOtp = async (req, res) => {
         purpose === 'signup' ? existingRecord?.pendingUser : undefined,
     });
 
-    res.json({ message: 'OTP resent successfully' });
+    res.json({ message: 'New OTP generated.', otp });
   } catch (error) {
     console.error('[RESEND OTP ERROR]', error.message);
-    if (error.isEmailError) {
-      return res
-        .status(503)
-        .json({ message: 'Failed to send OTP email. Please try again.' });
-    }
     res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
 // ─── LOGIN ───────────────────────────────────────────────────────────────────
 // POST /api/auth/login
-// Step 1: verify credentials → send OTP
+// Verifies credentials, generates OTP, returns OTP in response
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -224,33 +208,27 @@ export const login = async (req, res) => {
     const user = await User.findOne({ email }).select('+password');
     if (!user) return res.status(400).json({ message: 'User not found' });
 
-    const isMatch = comparePassword(password, user.password);
+    const isMatch = await comparePassword(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid password' });
 
     const otp = generateOtp();
-
-    // Send email FIRST — only save to DB if it succeeds
-    await sendOtpEmail(email, otp, 'login');
 
     await Otp.deleteMany({ email, purpose: 'login' });
     await Otp.create({ email, otp, purpose: 'login' });
 
     res.json({
-      message: 'OTP sent to your email. Please verify to complete login.',
+      message: 'OTP generated. Please verify to complete login.',
+      otp, // show in frontend via react-hot-toast
     });
   } catch (error) {
     console.error('[LOGIN ERROR]', error.message);
-    if (error.isEmailError) {
-      return res
-        .status(503)
-        .json({ message: 'Failed to send OTP email. Please try again.' });
-    }
     res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
 // ─── VERIFY LOGIN OTP ────────────────────────────────────────────────────────
 // POST /api/auth/verify-login
+// body: { email, otp }
 export const verifyLoginOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
