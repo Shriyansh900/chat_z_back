@@ -3,9 +3,18 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.model.js';
 
 export const initSocket = (server) => {
+  const allowedOrigins = process.env.CLIENT_URL
+    ? process.env.CLIENT_URL.split(',').map((o) => o.trim())
+    : [];
+
   const io = new Server(server, {
     cors: {
-      origin: true,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (process.env.NODE_ENV !== 'production') return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`CORS: socket origin ${origin} not allowed`));
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -31,17 +40,17 @@ export const initSocket = (server) => {
   io.on('connection', async (socket) => {
     console.log('User connected:', socket.id, '| userId:', socket.userId);
 
-    // Mark user online
-    await User.findByIdAndUpdate(socket.userId, {
-      isOnline: true,
-      lastSeen: new Date(),
-    });
+    try {
+      await User.findByIdAndUpdate(socket.userId, {
+        isOnline: true,
+        lastSeen: new Date(),
+      });
+    } catch (e) {
+      console.error('[SOCKET] Failed to mark user online:', e.message);
+    }
 
-    // Join personal room (for direct notifications)
     socket.join(socket.userId);
     socket.emit('connected');
-
-    // Broadcast online status to all connected clients
     io.emit('user_online', { userId: socket.userId });
 
     // ─── Join a chat room ──────────────────────────────────────────────────
@@ -72,15 +81,18 @@ export const initSocket = (server) => {
     // ─── Disconnect ────────────────────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
-
-      // Mark user offline and record lastSeen
-      await User.findByIdAndUpdate(socket.userId, {
-        isOnline: false,
-        lastSeen: new Date(),
-      });
-
-      // Broadcast offline status
-      io.emit('user_offline', { userId: socket.userId, lastSeen: new Date() });
+      try {
+        await User.findByIdAndUpdate(socket.userId, {
+          isOnline: false,
+          lastSeen: new Date(),
+        });
+        io.emit('user_offline', {
+          userId: socket.userId,
+          lastSeen: new Date(),
+        });
+      } catch (e) {
+        console.error('[SOCKET] Failed to mark user offline:', e.message);
+      }
     });
   });
 };
