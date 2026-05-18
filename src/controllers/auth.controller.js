@@ -32,8 +32,8 @@ const setRefreshCookie = (res, token) => {
 
 // ─── SIGNUP ──────────────────────────────────────────────────────────────────
 // POST /api/auth/signup
-// Step 1: validate → upload avatar → send OTP → store pending data in OTP record
-// User is NOT created yet — only created after OTP is verified
+// Step 1: validate → upload avatar → send OTP → store pending data
+// User is NOT created until OTP is verified
 export const signup = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -42,16 +42,14 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // Check duplicates before doing anything else
     const existing = await User.findOne({ $or: [{ email }, { username }] });
     if (existing) {
       return res.status(409).json({ message: 'User already exists' });
     }
 
     const hashed = await hashPassword(password);
-
-    // Upload avatar to Cloudinary if provided
     const pendingUser = { username, hashedPassword: hashed };
+
     if (req.file) {
       const result = await uploadToCloudinary(req.file.buffer, {
         folder: 'chatz/avatars',
@@ -63,9 +61,9 @@ export const signup = async (req, res) => {
       pendingUser.avatarPublicId = result.public_id;
     }
 
-    // Send OTP FIRST — only save to DB if it succeeds
-    // This way a failed email never leaves a stale OTP or orphaned data
     const otp = generateOtp();
+
+    // Send email FIRST — only save to DB if it succeeds
     await sendOtpEmail(email, otp, 'signup');
 
     await Otp.deleteMany({ email, purpose: 'signup' });
@@ -76,17 +74,13 @@ export const signup = async (req, res) => {
         'OTP sent to your email. Please verify to complete registration.',
     });
   } catch (error) {
-    console.error(error);
-    if (
-      error.message?.includes('MAIL_USER') ||
-      error.code === 'EAUTH' ||
-      error.responseCode >= 500
-    ) {
+    console.error('[SIGNUP ERROR]', error.message, error.code || '');
+    if (error.isEmailError) {
       return res
         .status(503)
         .json({ message: 'Failed to send OTP email. Please try again.' });
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -106,7 +100,14 @@ export const verifySignupOtp = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Check if user was already created (edge case: double submit)
+    if (!record.pendingUser || !record.pendingUser.hashedPassword) {
+      await Otp.deleteMany({ email, purpose: 'signup' });
+      return res.status(400).json({
+        message: 'Signup session expired. Please sign up again.',
+      });
+    }
+
+    // Edge case: double submit
     const alreadyExists = await User.findOne({ email });
     if (alreadyExists) {
       await Otp.deleteMany({ email, purpose: 'signup' });
@@ -115,7 +116,6 @@ export const verifySignupOtp = async (req, res) => {
         .json({ message: 'User already exists. Please login.' });
     }
 
-    // Create user now using the pending data stored in the OTP record
     const { username, hashedPassword, avatar, avatarPublicId } =
       record.pendingUser;
 
@@ -142,8 +142,8 @@ export const verifySignupOtp = async (req, res) => {
     setRefreshCookie(res, refreshToken);
     res.status(201).json({ accessToken, user: sanitizeUser(user) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[VERIFY SIGNUP ERROR]', error.message);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -166,24 +166,25 @@ export const resendOtp = async (req, res) => {
     }
 
     if (purpose === 'login') {
-      // For login resend, user must exist
+      // For login: user must exist in DB
       const user = await User.findOne({ email });
       if (!user) return res.status(404).json({ message: 'User not found' });
-    } else {
-      // For signup resend, pending OTP record must exist (user not created yet)
-      const pending = await Otp.findOne({ email, purpose: 'signup' });
-      if (!pending) {
+    }
+
+    // Read existing record BEFORE deleting (preserves pendingUser for signup)
+    const existingRecord = await Otp.findOne({ email, purpose });
+
+    if (purpose === 'signup') {
+      // For signup: pending OTP record must exist (user not in DB yet)
+      if (!existingRecord || !existingRecord.pendingUser?.hashedPassword) {
         return res.status(404).json({
           message:
-            'No pending signup found for this email. Please signup again.',
+            'No pending signup found for this email. Please sign up again.',
         });
       }
     }
 
     const otp = generateOtp();
-
-    // Read existing record BEFORE deleting (to preserve pendingUser for signup)
-    const existingRecord = await Otp.findOne({ email, purpose });
 
     // Send email first — only update DB if it succeeds
     await sendOtpEmail(email, otp, purpose);
@@ -199,24 +200,19 @@ export const resendOtp = async (req, res) => {
 
     res.json({ message: 'OTP resent successfully' });
   } catch (error) {
-    console.error(error);
-    if (
-      error.message?.includes('MAIL_USER') ||
-      error.code === 'EAUTH' ||
-      error.responseCode >= 500
-    ) {
+    console.error('[RESEND OTP ERROR]', error.message);
+    if (error.isEmailError) {
       return res
         .status(503)
         .json({ message: 'Failed to send OTP email. Please try again.' });
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
 // ─── LOGIN ───────────────────────────────────────────────────────────────────
 // POST /api/auth/login
 // Step 1: verify credentials → send OTP
-// OTP is only saved AFTER email is sent successfully — safe to retry
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -234,7 +230,6 @@ export const login = async (req, res) => {
     const otp = generateOtp();
 
     // Send email FIRST — only save to DB if it succeeds
-    // This way a failed email never leaves a stale OTP in the DB
     await sendOtpEmail(email, otp, 'login');
 
     await Otp.deleteMany({ email, purpose: 'login' });
@@ -244,18 +239,13 @@ export const login = async (req, res) => {
       message: 'OTP sent to your email. Please verify to complete login.',
     });
   } catch (error) {
-    console.error(error);
-    // Distinguish email failure from other errors
-    if (
-      error.message?.includes('MAIL_USER') ||
-      error.code === 'EAUTH' ||
-      error.responseCode >= 500
-    ) {
+    console.error('[LOGIN ERROR]', error.message);
+    if (error.isEmailError) {
       return res
         .status(503)
         .json({ message: 'Failed to send OTP email. Please try again.' });
     }
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -292,8 +282,8 @@ export const verifyLoginOtp = async (req, res) => {
     setRefreshCookie(res, refreshToken);
     res.json({ accessToken, user: sanitizeUser(user) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[VERIFY LOGIN ERROR]', error.message);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -330,8 +320,8 @@ export const refresh = async (req, res) => {
     setRefreshCookie(res, newRefreshToken);
     res.json({ accessToken: newAccessToken });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[REFRESH ERROR]', error.message);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -350,7 +340,7 @@ export const logout = async (req, res) => {
 
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[LOGOUT ERROR]', error.message);
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
