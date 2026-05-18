@@ -41,14 +41,13 @@ const router = express.Router();
  *               avatar: { type: string, format: binary }
  *     responses:
  *       201:
- *         description: Account created — OTP sent to email
+ *         description: OTP sent to email — user created only after verification
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 message: { type: string }
- *                 userId: { type: string }
+ *                 message: { type: string, example: OTP sent to your email. Please verify to complete registration. }
  *       409:
  *         description: User already exists
  *         content:
@@ -117,8 +116,7 @@ router.post('/verify-signup', verifySignupOtp);
  *             schema:
  *               type: object
  *               properties:
- *                 message: { type: string }
- *                 userId: { type: string }
+ *                 message: { type: string, example: OTP sent to your email. Please verify to complete login. }
  *       400:
  *         description: Invalid credentials
  *         content:

@@ -1,16 +1,12 @@
 import mongoose from 'mongoose';
 
 const otpSchema = new mongoose.Schema({
-  email: { type: String, required: true },
+  email: { type: String, required: true, index: true },
   otp: { type: String, required: true },
-  purpose: {
-    type: String,
-    enum: ['signup', 'login'],
-    required: true,
-  },
+  purpose: { type: String, enum: ['signup', 'login'], required: true },
 
   // Pending signup data — stored here until OTP is verified
-  // Only used for purpose === 'signup'
+  // Only populated for purpose === 'signup'
   pendingUser: {
     username: { type: String },
     hashedPassword: { type: String },
@@ -18,11 +14,11 @@ const otpSchema = new mongoose.Schema({
     avatarPublicId: { type: String },
   },
 
-  // MongoDB TTL index — auto deletes document after 10 minutes
+  // TTL — MongoDB auto-deletes this document 10 minutes after creation
   expiresAt: {
     type: Date,
     default: () => new Date(Date.now() + 10 * 60 * 1000),
-    index: { expires: 0 },
+    expires: 0, // correct TTL syntax: 0 means "delete at expiresAt"
   },
 });
 
