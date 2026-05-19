@@ -27,10 +27,16 @@ export const accessChat = async (req, res) => {
     }
 
     // Check if a 1-on-1 chat already exists
+    // MongoDB $size doesn't work with $all reliably, so fetch and filter in code
     let chat = await Chat.findOne({
       isGroup: false,
-      users: { $all: [req.user.id, userId], $size: 2 },
+      users: { $all: [req.user.id, userId] },
     }).populate('users', '-password');
+
+    // Ensure it's exactly a 1-on-1 chat (exactly 2 users)
+    if (chat && chat.users.length !== 2) {
+      chat = null;
+    }
 
     if (chat) return res.json(chat);
 

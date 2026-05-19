@@ -20,13 +20,37 @@ export const sendFriendRequest = async (req, res) => {
     const receiver = await User.findById(receiverId);
     if (!receiver) return res.status(404).json({ message: 'User not found' });
 
+    // Check if receiver has blocked the sender
+    if (receiver.blockedUsers?.map(String).includes(req.user.id)) {
+      return res.status(403).json({ message: 'This user has blocked you' });
+    }
+
     const existing = await FriendRequest.findOne({
-      sender: req.user.id,
-      receiver: receiverId,
+      $or: [
+        { sender: req.user.id, receiver: receiverId },
+        { sender: receiverId, receiver: req.user.id },
+      ],
       status: 'pending',
     });
     if (existing) {
-      return res.status(409).json({ message: 'Friend request already sent' });
+      return res.status(409).json({
+        message:
+          existing.sender === req.user.id
+            ? 'Friend request already sent'
+            : 'This user has already sent you a friend request',
+      });
+    }
+
+    // Check if already friends
+    const alreadyFriends = await FriendRequest.findOne({
+      $or: [
+        { sender: req.user.id, receiver: receiverId },
+        { sender: receiverId, receiver: req.user.id },
+      ],
+      status: 'accepted',
+    });
+    if (alreadyFriends) {
+      return res.status(409).json({ message: 'Already friends with this user' });
     }
 
     const request = await FriendRequest.create({

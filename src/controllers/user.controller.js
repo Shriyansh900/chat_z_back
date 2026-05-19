@@ -3,6 +3,7 @@ import RefreshToken from '../models/RefreshToken.model.js';
 import FriendRequest from '../models/FriendRequest.model.js';
 import Chat from '../models/Chat.model.js';
 import Message from '../models/Message.model.js';
+import Group from '../models/Group.model.js';
 import {
   uploadToCloudinary,
   deleteFromCloudinary,
@@ -134,10 +135,20 @@ export const deleteProfile = async (req, res) => {
       FriendRequest.deleteMany({
         $or: [{ sender: req.user.id }, { receiver: req.user.id }],
       }),
-      Message.deleteMany({ sender: req.user.id }),
+      Message.deleteMany({
+        $or: [
+          { sender: req.user.id },
+          { 'groupEncrypted.userId': req.user.id },
+        ],
+      }),
       Chat.updateMany(
         { users: req.user.id },
         { $pull: { users: req.user.id } },
+      ),
+      Group.deleteMany({ admin: req.user.id }),
+      Group.updateMany(
+        { members: req.user.id },
+        { $pull: { members: req.user.id } },
       ),
       User.findByIdAndDelete(req.user.id),
     ]);
