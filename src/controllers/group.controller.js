@@ -1,5 +1,6 @@
 import Group from '../models/Group.model.js';
 import Chat from '../models/Chat.model.js';
+import Message from '../models/Message.model.js';
 
 // POST /api/groups
 // Create a group (also creates a linked group chat)
@@ -221,6 +222,7 @@ export const deleteGroup = async (req, res) => {
     }
 
     await Promise.all([
+      Message.deleteMany({ chat: group.chat }),
       Chat.findByIdAndDelete(group.chat),
       Group.findByIdAndDelete(req.params.id),
     ]);
