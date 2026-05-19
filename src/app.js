@@ -14,32 +14,35 @@ import messageRoutes from './routes/message.routes.js';
 const app = express();
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-// Must be FIRST — before body parsers so OPTIONS preflight is handled correctly
+const ALLOWED_ORIGINS = [
+  'https://chat-z-eight.vercel.app', // production frontend
+  'http://localhost:3000', // local dev
+  'http://localhost:5173', // vite dev server (if used)
+];
+
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, curl, server-to-server)
+    // Allow requests with no origin (Postman, curl, mobile apps)
     if (!origin) return callback(null, true);
 
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
+    // Check hardcoded list first
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
 
-    // In production — read CLIENT_URL at request time (not at module load)
-    const allowedOrigins = process.env.CLIENT_URL
-      ? process.env.CLIENT_URL.split(',').map((o) => o.trim())
+    // Also check CLIENT_URL env var (supports comma-separated list for extra origins)
+    const envOrigins = process.env.CLIENT_URL
+      ? process.env.CLIENT_URL.split(',').map((o) =>
+          o.trim().replace(/\/$/, ''),
+        )
       : [];
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+    if (envOrigins.includes(origin)) return callback(null, true);
 
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
-  credentials: true, // required for cookies
+  credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Set-Cookie'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  optionsSuccessStatus: 200, // some browsers (IE11) choke on 204
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));

@@ -3,16 +3,23 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.model.js';
 
 export const initSocket = (server) => {
-  const allowedOrigins = process.env.CLIENT_URL
-    ? process.env.CLIENT_URL.split(',').map((o) => o.trim())
-    : [];
+  const ALLOWED_ORIGINS = [
+    'https://chat-z-eight.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ];
 
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        if (process.env.NODE_ENV !== 'production') return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        const envOrigins = process.env.CLIENT_URL
+          ? process.env.CLIENT_URL.split(',').map((o) =>
+              o.trim().replace(/\/$/, ''),
+            )
+          : [];
+        if (envOrigins.includes(origin)) return callback(null, true);
         callback(new Error(`CORS: socket origin ${origin} not allowed`));
       },
       methods: ['GET', 'POST'],
