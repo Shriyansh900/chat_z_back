@@ -264,25 +264,6 @@
           }
         },
         {
-          "name": "Upload Public Key (E2E)",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/users/me/public-key",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "me", "public-key"]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"publicKey\": \"{\\\"kty\\\":\\\"RSA\\\",\\\"alg\\\":\\\"RSA-OAEP-256\\\",\\\"n\\\":\\\"samplebase64\\\",\\\"e\\\":\\\"AQAB\\\",\\\"key_ops\\\":[\\\"encrypt\\\"],\\\"ext\\\":true}\"\n}"
-            }
-          }
-        },
-        {
           "name": "Get User by ID",
           "request": {
             "method": "GET",
@@ -293,20 +274,6 @@
               "raw": "{{baseUrl}}/users/{{userId}}",
               "host": ["{{baseUrl}}"],
               "path": ["users", "{{userId}}"]
-            }
-          }
-        },
-        {
-          "name": "Get User Public Key (E2E)",
-          "request": {
-            "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/public-key",
-              "host": ["{{baseUrl}}"],
-              "path": ["users", "{{userId}}", "public-key"]
             }
           }
         },
@@ -407,7 +374,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"content\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\",\n  \"senderContent\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\"\n}"
+              "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"content\": \"Hello there!\"\n}"
             }
           },
           "event": [
@@ -440,35 +407,11 @@
                 { "key": "chatId", "value": "{{chatId}}", "type": "text" },
                 {
                   "key": "content",
-                  "value": "dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==",
-                  "type": "text"
-                },
-                {
-                  "key": "senderContent",
-                  "value": "dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==",
+                  "value": "Check this file",
                   "type": "text"
                 },
                 { "key": "file", "type": "file", "src": "" }
               ]
-            }
-          }
-        },
-        {
-          "name": "Send Group Message",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/messages",
-              "host": ["{{baseUrl}}"],
-              "path": ["messages"]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"senderContent\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\",\n  \"groupEncrypted\": [\n    { \"userId\": \"MEMBER_1_ID\", \"encryptedContent\": \"dGVzdA==\" },\n    { \"userId\": \"MEMBER_2_ID\", \"encryptedContent\": \"dGVzdA==\" }\n  ]\n}"
             }
           }
         },

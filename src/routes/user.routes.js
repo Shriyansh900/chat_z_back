@@ -8,8 +8,6 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
-  uploadPublicKey,
-  getPublicKey,
 } from '../controllers/user.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
 import { upload } from '../middlewares/upload.middleware.js';
@@ -20,7 +18,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Users
- *   description: User profile, search, block/unblock, and E2E key exchange
+ *   description: User profile, search, and block/unblock
  */
 
 /**
@@ -77,36 +75,6 @@ router.get('/me', protect, getProfile);
  *               items: { $ref: '#/components/schemas/User' }
  */
 router.get('/me/blocked', protect, getBlockedUsers);
-
-/**
- * @swagger
- * /users/me/public-key:
- *   post:
- *     summary: Register RSA public key for E2E encryption
- *     tags: [Users]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [publicKey]
- *             properties:
- *               publicKey:
- *                 type: string
- *                 description: RSA/EC public key as JWK JSON string
- *                 example: '{"kty":"RSA","alg":"RSA-OAEP-256","n":"...","e":"AQAB","key_ops":["encrypt"],"ext":true}'
- *     responses:
- *       200:
- *         description: Public key registered
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message: { type: string, example: Public key registered }
- */
-router.post('/me/public-key', protect, uploadPublicKey);
 
 /**
  * @swagger
@@ -235,36 +203,5 @@ router.post('/:userId/block', protect, blockUser);
  *                 message: { type: string, example: User unblocked }
  */
 router.delete('/:userId/block', protect, unblockUser);
-
-/**
- * @swagger
- * /users/{userId}/public-key:
- *   get:
- *     summary: Get another user's public key for E2E encryption
- *     tags: [Users]
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema: { type: string }
- *         example: 664f1a2b3c4d5e6f7a8b9c0d
- *     responses:
- *       200:
- *         description: User's public key
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 userId: { type: string }
- *                 username: { type: string }
- *                 publicKey: { type: string }
- *       404:
- *         description: User not found or key not registered
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/Error' }
- */
-router.get('/:userId/public-key', protect, getPublicKey);
 
 export default router;

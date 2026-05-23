@@ -135,12 +135,7 @@ export const deleteProfile = async (req, res) => {
       FriendRequest.deleteMany({
         $or: [{ sender: req.user.id }, { receiver: req.user.id }],
       }),
-      Message.deleteMany({
-        $or: [
-          { sender: req.user.id },
-          { 'groupEncrypted.userId': req.user.id },
-        ],
-      }),
+      Message.deleteMany({ sender: req.user.id }),
       Chat.updateMany(
         { users: req.user.id },
         { $pull: { users: req.user.id } },
@@ -214,64 +209,6 @@ export const getBlockedUsers = async (req, res) => {
       .populate('blockedUsers', 'username avatar');
 
     res.json(user.blockedUsers);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// ─── UPLOAD PUBLIC KEY ───────────────────────────────────────────────────────
-// POST /api/users/me/public-key
-export const uploadPublicKey = async (req, res) => {
-  try {
-    const { publicKey } = req.body;
-
-    if (!publicKey) {
-      return res.status(400).json({ message: 'publicKey is required' });
-    }
-
-    try {
-      const parsed = JSON.parse(publicKey);
-      if (parsed.kty !== 'RSA' && parsed.kty !== 'EC') {
-        return res
-          .status(400)
-          .json({ message: 'Invalid key format. Expected RSA or EC JWK.' });
-      }
-    } catch {
-      return res
-        .status(400)
-        .json({ message: 'publicKey must be a valid JWK JSON string' });
-    }
-
-    await User.findByIdAndUpdate(req.user.id, { publicKey });
-    res.json({ message: 'Public key registered' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// ─── GET USER PUBLIC KEY ─────────────────────────────────────────────────────
-// GET /api/users/:userId/public-key
-export const getPublicKey = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId).select(
-      'publicKey username',
-    );
-
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (!user.publicKey) {
-      return res
-        .status(404)
-        .json({ message: 'This user has not registered a public key yet' });
-    }
-
-    res.json({
-      userId: user._id,
-      username: user.username,
-      publicKey: user.publicKey,
-    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

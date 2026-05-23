@@ -8,25 +8,13 @@ import {
 // POST /api/messages
 export const sendMessage = async (req, res) => {
   try {
-    const { chatId, content, senderContent } = req.body;
-
-    // groupEncrypted may arrive as JSON string in multipart/form-data
-    let groupEncrypted = req.body.groupEncrypted;
-    if (typeof groupEncrypted === 'string') {
-      try {
-        groupEncrypted = JSON.parse(groupEncrypted);
-      } catch {
-        groupEncrypted = [];
-      }
-    }
+    const { chatId, content } = req.body;
 
     if (!chatId) {
       return res.status(400).json({ message: 'chatId is required' });
     }
 
-    const hasContent =
-      content || (Array.isArray(groupEncrypted) && groupEncrypted.length > 0);
-    if (!hasContent && !req.file) {
+    if (!content && !req.file) {
       return res.status(400).json({ message: 'content or file is required' });
     }
 
@@ -40,16 +28,8 @@ export const sendMessage = async (req, res) => {
     const messageData = {
       sender: req.user.id,
       chat: chatId,
-      isEncrypted: true,
+      content: content || '',
     };
-
-    if (chat.isGroup) {
-      messageData.groupEncrypted = groupEncrypted || [];
-      messageData.senderContent = senderContent || '';
-    } else {
-      messageData.content = content || '';
-      messageData.senderContent = senderContent || '';
-    }
 
     if (req.file) {
       const mime = req.file.mimetype;
@@ -68,7 +48,7 @@ export const sendMessage = async (req, res) => {
     }
 
     let message = await Message.create(messageData);
-    message = await message.populate('sender', 'username avatar publicKey');
+    message = await message.populate('sender', 'username avatar');
     message = await message.populate('chat');
 
     await Chat.findByIdAndUpdate(chatId, {
@@ -95,35 +75,10 @@ export const getMessages = async (req, res) => {
     }
 
     const messages = await Message.find({ chat: chatId })
-      .populate('sender', 'username avatar publicKey')
+      .populate('sender', 'username avatar')
       .sort({ createdAt: 1 });
 
-    const userId = req.user.id;
-    // Use chat.isGroup from the already-fetched chat document (not from populated message.chat)
-    const isGroupChat = chat.isGroup;
-
-    const filtered = messages.map((msg) => {
-      const m = msg.toObject();
-
-      if (String(m.sender._id) === userId) {
-        m.myContent = m.senderContent;
-      } else if (isGroupChat) {
-        const entry = m.groupEncrypted?.find(
-          (e) => String(e.userId) === userId,
-        );
-        m.myContent = entry?.encryptedContent || null;
-      } else {
-        m.myContent = m.content;
-      }
-
-      delete m.content;
-      delete m.senderContent;
-      delete m.groupEncrypted;
-
-      return m;
-    });
-
-    res.json(filtered);
+    res.json(messages);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

@@ -9,7 +9,7 @@ const options = {
       description: `
 ## ChatZ REST API
 
-Real-time E2E encrypted chat application.
+Real-time chat application.
 
 ### Authentication Flow
 1. **Signup** — \`POST /auth/signup\` → returns a **4-digit OTP** in the response
@@ -93,11 +93,6 @@ OTP is returned directly in the API response (4 digits). Display it to the user 
             isVerified: { type: 'boolean', example: true },
             isOnline: { type: 'boolean', example: true },
             lastSeen: { type: 'string', format: 'date-time', nullable: true },
-            publicKey: {
-              type: 'string',
-              nullable: true,
-              example: '{"kty":"RSA","n":"...","e":"AQAB"}',
-            },
             createdAt: { type: 'string', format: 'date-time' },
           },
         },
@@ -107,10 +102,9 @@ OTP is returned directly in the API response (4 digits). Display it to the user 
             _id: { type: 'string', example: '664f1a2b3c4d5e6f7a8b9c0d' },
             sender: { $ref: '#/components/schemas/User' },
             chat: { type: 'string', example: '664f1a2b3c4d5e6f7a8b9c0d' },
-            myContent: {
+            content: {
               type: 'string',
-              description: 'Ciphertext for the requesting user (base64)',
-              example: 'dGVzdCBlbmNyeXB0ZWQ=',
+              example: 'Hello there!',
             },
             file: {
               type: 'string',
@@ -123,7 +117,6 @@ OTP is returned directly in the API response (4 digits). Display it to the user 
               nullable: true,
               enum: ['image', 'video', 'raw'],
             },
-            isEncrypted: { type: 'boolean', example: true },
             createdAt: { type: 'string', format: 'date-time' },
           },
         },
