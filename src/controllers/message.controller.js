@@ -4,6 +4,7 @@ import {
   uploadToCloudinary,
   deleteFromCloudinary,
 } from '../utils/uploadToCloudinary.js';
+import { getIo } from '../config/socket.js';
 
 // POST /api/messages
 export const sendMessage = async (req, res) => {
@@ -54,6 +55,13 @@ export const sendMessage = async (req, res) => {
     await Chat.findByIdAndUpdate(chatId, {
       $set: { lastMessage: message._id, updatedAt: new Date() },
     });
+
+    // Emit real-time event to all members in the chat room
+    try {
+      getIo().to(chatId).emit('receive_message', message);
+    } catch (e) {
+      console.error('[SOCKET] Failed to emit receive_message:', e.message);
+    }
 
     res.status(201).json(message);
   } catch (error) {
@@ -113,6 +121,18 @@ export const deleteMessage = async (req, res) => {
       { lastMessage: req.params.messageId },
       { $set: { lastMessage: null } },
     );
+
+    // Emit real-time deletion event to the chat room
+    try {
+      getIo()
+        .to(String(message.chat))
+        .emit('message_deleted', {
+          messageId: req.params.messageId,
+          chatId: String(message.chat),
+        });
+    } catch (e) {
+      console.error('[SOCKET] Failed to emit message_deleted:', e.message);
+    }
 
     res.json({ message: 'Message deleted' });
   } catch (error) {
