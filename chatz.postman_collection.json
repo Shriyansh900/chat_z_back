@@ -5,6 +5,7 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "https://chat-z-back.onrender.com/api" },
+    { "key": "socketUrl", "value": "https://chat-z-back.onrender.com" },
     { "key": "accessToken", "value": "" },
     { "key": "userId", "value": "" },
     { "key": "chatId", "value": "" },
@@ -699,6 +700,102 @@
               "host": ["{{baseUrl}}"],
               "path": ["groups", "{{groupId}}"]
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Socket.IO Events (Reference)",
+      "description": "Socket.IO runs on {{socketUrl}}. Connect with: io(socketUrl, { auth: { token: accessToken } })\n\nAuthentication is enforced server-side via JWT middleware — connection is rejected without a valid token.",
+      "item": [
+        {
+          "name": "[emit] join_chat",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Join a chat room to receive real-time messages.\nServer validates that the user is a member of the chat before joining.\n\nEmit:\n  socket.emit('join_chat', chatId)\n\nPayload: chatId (string)"
+          }
+        },
+        {
+          "name": "[emit] typing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Notify other members that the user is typing.\n\nEmit:\n  socket.emit('typing', chatId)\n\nPayload: chatId (string)\n\nOthers in the room receive:\n  { chatId, userId }"
+          }
+        },
+        {
+          "name": "[emit] stop_typing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Notify other members that the user stopped typing.\n\nEmit:\n  socket.emit('stop_typing', chatId)\n\nPayload: chatId (string)\n\nOthers in the room receive:\n  { chatId, userId }"
+          }
+        },
+        {
+          "name": "[on] connected",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Fired by server after successful authenticated connection.\n\nListen:\n  socket.on('connected', () => {})\n\nNo payload."
+          }
+        },
+        {
+          "name": "[on] receive_message",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Fired by server when a new message is saved via POST /api/messages.\nOnly received if the client has joined the chat room via join_chat.\n\nListen:\n  socket.on('receive_message', (message) => {})\n\nPayload: full Message object (same shape as REST API response)\n  { _id, sender: { _id, username, avatar }, chat, content, file, fileType, createdAt }"
+          }
+        },
+        {
+          "name": "[on] message_deleted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Fired by server when a message is deleted via DELETE /api/messages/:messageId.\nOnly received if the client has joined the chat room via join_chat.\n\nListen:\n  socket.on('message_deleted', (data) => {})\n\nPayload:\n  { messageId, chatId }"
+          }
+        },
+        {
+          "name": "[on] user_online",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Fired when a friend comes online. Only sent to accepted friends.\n\nListen:\n  socket.on('user_online', (data) => {})\n\nPayload:\n  { userId }"
+          }
+        },
+        {
+          "name": "[on] user_offline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Fired when a friend disconnects. Only sent to accepted friends.\n\nListen:\n  socket.on('user_offline', (data) => {})\n\nPayload:\n  { userId, lastSeen }"
+          }
+        },
+        {
+          "name": "[on] typing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Received when another member in the chat room is typing.\n\nListen:\n  socket.on('typing', (data) => {})\n\nPayload:\n  { chatId, userId }"
+          }
+        },
+        {
+          "name": "[on] stop_typing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Received when another member in the chat room stopped typing.\n\nListen:\n  socket.on('stop_typing', (data) => {})\n\nPayload:\n  { chatId, userId }"
           }
         }
       ]

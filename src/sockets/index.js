@@ -1,6 +1,9 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.model.js';
+import Chat from '../models/Chat.model.js';
+import FriendRequest from '../models/FriendRequest.model.js';
+import { setIo } from '../config/socket.js';
 
 export const initSocket = (server) => {
   const io = new Server(server, {
@@ -9,6 +12,9 @@ export const initSocket = (server) => {
       methods: ['GET', 'POST'],
     },
   });
+
+  // Export io singleton so controllers can emit events
+  setIo(io);
 
   // ─── Auth middleware — verify JWT before any socket event ─────────────────
   io.use((socket, next) => {
@@ -30,6 +36,7 @@ export const initSocket = (server) => {
   io.on('connection', async (socket) => {
     console.log('User connected:', socket.id, '| userId:', socket.userId);
 
+    // Mark user online in DB
     try {
       await User.findByIdAndUpdate(socket.userId, {
         isOnline: true,
@@ -39,24 +46,44 @@ export const initSocket = (server) => {
       console.error('[SOCKET] Failed to mark user online:', e.message);
     }
 
+    // Each user joins their own personal room (for direct notifications)
     socket.join(socket.userId);
     socket.emit('connected');
-    io.emit('user_online', { userId: socket.userId });
 
-    // ─── Join a chat room ──────────────────────────────────────────────────
-    socket.on('join_chat', (chatId) => {
-      socket.join(chatId);
-    });
+    // Notify only friends that this user is online
+    try {
+      const friendships = await FriendRequest.find({
+        $or: [{ sender: socket.userId }, { receiver: socket.userId }],
+        status: 'accepted',
+      });
 
-    // ─── Send message — broadcast to chat room ─────────────────────────────
-    socket.on('send_message', (data) => {
-      io.to(data.chatId).emit('receive_message', data);
-    });
+      friendships.forEach((f) => {
+        const friendId =
+          String(f.sender) === socket.userId
+            ? String(f.receiver)
+            : String(f.sender);
+        io.to(friendId).emit('user_online', { userId: socket.userId });
+      });
+    } catch (e) {
+      console.error(
+        '[SOCKET] Failed to notify friends of online status:',
+        e.message,
+      );
+    }
 
-    // ─── Message deleted ───────────────────────────────────────────────────
-    socket.on('delete_message', (data) => {
-      // data: { chatId, messageId }
-      io.to(data.chatId).emit('message_deleted', data);
+    // ─── Join a chat room (validated) ─────────────────────────────────────
+    socket.on('join_chat', async (chatId) => {
+      try {
+        const chat = await Chat.findById(chatId);
+        if (!chat) return;
+
+        const isMember = chat.users.map(String).includes(socket.userId);
+        if (!isMember) return;
+
+        socket.join(chatId);
+      } catch (e) {
+        console.error('[SOCKET] join_chat error:', e.message);
+      }
     });
 
     // ─── Typing indicators ─────────────────────────────────────────────────
@@ -71,17 +98,40 @@ export const initSocket = (server) => {
     // ─── Disconnect ────────────────────────────────────────────────────────
     socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
+
+      const lastSeen = new Date();
+
       try {
         await User.findByIdAndUpdate(socket.userId, {
           isOnline: false,
-          lastSeen: new Date(),
-        });
-        io.emit('user_offline', {
-          userId: socket.userId,
-          lastSeen: new Date(),
+          lastSeen,
         });
       } catch (e) {
         console.error('[SOCKET] Failed to mark user offline:', e.message);
+      }
+
+      // Notify only friends that this user went offline
+      try {
+        const friendships = await FriendRequest.find({
+          $or: [{ sender: socket.userId }, { receiver: socket.userId }],
+          status: 'accepted',
+        });
+
+        friendships.forEach((f) => {
+          const friendId =
+            String(f.sender) === socket.userId
+              ? String(f.receiver)
+              : String(f.sender);
+          io.to(friendId).emit('user_offline', {
+            userId: socket.userId,
+            lastSeen,
+          });
+        });
+      } catch (e) {
+        console.error(
+          '[SOCKET] Failed to notify friends of offline status:',
+          e.message,
+        );
       }
     });
   });
