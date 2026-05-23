@@ -18,7 +18,6 @@ const userSchema = new mongoose.Schema(
     isOnline: { type: Boolean, default: false },
     lastSeen: { type: Date, default: null },
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    publicKey: { type: String, default: null },
   },
   { timestamps: true },
 );
