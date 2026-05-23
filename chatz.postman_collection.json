@@ -8,6 +8,7 @@
     { "key": "accessToken", "value": "" },
     { "key": "userId", "value": "" },
     { "key": "chatId", "value": "" },
+    { "key": "messageId", "value": "" },
     { "key": "friendRequestId", "value": "" },
     { "key": "groupId", "value": "" }
   ],
@@ -41,7 +42,7 @@
               "script": {
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.userId) pm.environment.set('userId', res.userId);"
+                  "if (res.userId) pm.collectionVariables.set('userId', res.userId);"
                 ]
               }
             }
@@ -59,7 +60,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"123456\"\n}"
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"1234\"\n}"
             }
           },
           "event": [
@@ -105,7 +106,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"123456\"\n}"
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"otp\": \"1234\"\n}"
             }
           },
           "event": [
@@ -122,6 +123,22 @@
               }
             }
           ]
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "resend-otp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"purpose\": \"login\"\n}"
+            }
+          }
         },
         {
           "name": "Refresh Token",
@@ -233,6 +250,20 @@
           }
         },
         {
+          "name": "Get Blocked Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/blocked",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "blocked"]
+            }
+          }
+        },
+        {
           "name": "Upload Public Key (E2E)",
           "request": {
             "method": "POST",
@@ -252,6 +283,20 @@
           }
         },
         {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            }
+          }
+        },
+        {
           "name": "Get User Public Key (E2E)",
           "request": {
             "method": "GET",
@@ -262,6 +307,34 @@
               "raw": "{{baseUrl}}/users/{{userId}}/public-key",
               "host": ["{{baseUrl}}"],
               "path": ["users", "{{userId}}", "public-key"]
+            }
+          }
+        },
+        {
+          "name": "Block User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/block",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "block"]
+            }
+          }
+        },
+        {
+          "name": "Unblock User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/block",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "block"]
             }
           }
         }
@@ -336,7 +409,18 @@
               "mode": "raw",
               "raw": "{\n  \"chatId\": \"{{chatId}}\",\n  \"content\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\",\n  \"senderContent\": \"dGVzdCBlbmNyeXB0ZWQgbWVzc2FnZQ==\"\n}"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res._id) pm.collectionVariables.set('messageId', res._id);"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Send Message (File)",
@@ -399,6 +483,20 @@
               "raw": "{{baseUrl}}/messages/{{chatId}}",
               "host": ["{{baseUrl}}"],
               "path": ["messages", "{{chatId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Message",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/{{messageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "{{messageId}}"]
             }
           }
         }
@@ -502,6 +600,20 @@
               "path": ["friends"]
             }
           }
+        },
+        {
+          "name": "Unfriend",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/friends/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["friends", "{{userId}}"]
+            }
+          }
         }
       ]
     },
@@ -593,9 +705,56 @@
               { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/{{groupId}}/members/MEMBER_ID",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/members/{{userId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["groups", "{{groupId}}", "members", "MEMBER_ID"]
+              "path": ["groups", "{{groupId}}", "members", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "Leave Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/leave",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "leave"]
+            }
+          }
+        },
+        {
+          "name": "Transfer Admin Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}/admin",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}", "admin"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"NEW_ADMIN_ID\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["groups", "{{groupId}}"]
             }
           }
         }
