@@ -8,6 +8,7 @@ import {
   blockUser,
   unblockUser,
   getBlockedUsers,
+  getOnlineFriends,
 } from '../controllers/user.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
 import { upload } from '../middlewares/upload.middleware.js';
@@ -75,6 +76,34 @@ router.get('/me', protect, getProfile);
  *               items: { $ref: '#/components/schemas/User' }
  */
 router.get('/me/blocked', protect, getBlockedUsers);
+
+/**
+ * @swagger
+ * /users/me/online-friends:
+ *   get:
+ *     summary: Get currently online accepted friends
+ *     tags: [Users]
+ *     description: >
+ *       Returns the subset of accepted friends who are currently online.
+ *       Call once on app load to seed the UI, then use socket events
+ *       (`user_online` / `user_offline`) for live updates.
+ *     responses:
+ *       200:
+ *         description: List of online friends
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   _id: { type: string }
+ *                   username: { type: string }
+ *                   avatar: { type: string }
+ *                   isOnline: { type: boolean, example: true }
+ *                   lastSeen: { type: string, format: date-time }
+ */
+router.get('/me/online-friends', protect, getOnlineFriends);
 
 /**
  * @swagger

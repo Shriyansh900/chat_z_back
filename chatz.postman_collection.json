@@ -265,6 +265,21 @@
           }
         },
         {
+          "name": "Get Online Friends",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/online-friends",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "online-friends"]
+            },
+            "description": "Call once on app load to get which friends are currently online. Use socket events user_online / user_offline for live updates after that."
+          }
+        },
+        {
           "name": "Get User by ID",
           "request": {
             "method": "GET",

@@ -214,3 +214,30 @@ export const getBlockedUsers = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// ─── GET ONLINE FRIENDS ──────────────────────────────────────────────────────
+// GET /api/users/me/online-friends
+// Returns the subset of accepted friends who are currently online.
+// Call this once on app load to seed the UI; use socket events for live updates.
+export const getOnlineFriends = async (req, res) => {
+  try {
+    const friendships = await FriendRequest.find({
+      $or: [{ sender: req.user.id }, { receiver: req.user.id }],
+      status: 'accepted',
+    }).lean();
+
+    const friendIds = friendships.map((f) =>
+      String(f.sender) === req.user.id ? String(f.receiver) : String(f.sender),
+    );
+
+    const onlineFriends = await User.find({
+      _id: { $in: friendIds },
+      isOnline: true,
+    }).select('_id username avatar isOnline lastSeen');
+
+    res.json(onlineFriends);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
