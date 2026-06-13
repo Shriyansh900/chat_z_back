@@ -10,6 +10,7 @@ import chatRoutes from './routes/chat.routes.js';
 import friendRoutes from './routes/friend.routes.js';
 import groupRoutes from './routes/group.routes.js';
 import messageRoutes from './routes/message.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 
 const app = express();
 
@@ -18,8 +19,8 @@ const ALLOWED_ORIGINS = [
   'https://chat-z-eight.vercel.app', // production frontend
   'http://localhost:3000', // local dev
   'http://localhost:5173',
-  'http://192.168.29.63:3000'
-   // vite dev server (if used)
+  'http://192.168.29.63:3000',
+  // vite dev server (if used)
 ];
 
 const corsOptions = {
@@ -78,6 +79,7 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {

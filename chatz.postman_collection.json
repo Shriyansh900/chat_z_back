@@ -11,7 +11,8 @@
     { "key": "chatId", "value": "" },
     { "key": "messageId", "value": "" },
     { "key": "friendRequestId", "value": "" },
-    { "key": "groupId", "value": "" }
+    { "key": "groupId", "value": "" },
+    { "key": "notificationId", "value": "" }
   ],
   "item": [
     {
@@ -720,6 +721,83 @@
       ]
     },
     {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get All Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications"]
+            },
+            "description": "Returns all notifications for the logged-in user, sorted newest first."
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "unread-count"]
+            },
+            "description": "Returns { count: N } — number of unread notifications."
+          }
+        },
+        {
+          "name": "Mark All As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "read-all"]
+            }
+          }
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}", "read"]
+            }
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "{{notificationId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Socket.IO Events (Reference)",
       "description": "Socket.IO runs on {{socketUrl}}. Connect with: io(socketUrl, { auth: { token: accessToken } })\n\nAuthentication is enforced server-side via JWT middleware — connection is rejected without a valid token.",
       "item": [
@@ -811,6 +889,15 @@
             "header": [],
             "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
             "description": "Received when another member in the chat room stopped typing.\n\nListen:\n  socket.on('stop_typing', (data) => {})\n\nPayload:\n  { chatId, userId }"
+          }
+        },
+        {
+          "name": "[on] notification",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{socketUrl}}", "host": ["{{socketUrl}}"] },
+            "description": "Fired in real-time when a notification is created for this user.\nOnly delivered if the user is currently connected.\nIf offline, the notification is saved to DB and returned via GET /api/notifications on next load.\n\nListen:\n  socket.on('notification', (data) => {})\n\nPayload:\n  { _id, type, title, body, senderId, isRead: false, createdAt }\n\nTypes:\n  'message'        — someone sent you a message\n  'friend_request' — someone sent you a friend request"
           }
         }
       ]

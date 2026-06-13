@@ -1,5 +1,6 @@
 import FriendRequest from '../models/FriendRequest.model.js';
 import User from '../models/User.model.js';
+import { createAndSend } from '../services/notification.service.js';
 
 // POST /api/friends/request
 // Send a friend request
@@ -35,7 +36,7 @@ export const sendFriendRequest = async (req, res) => {
     if (existing) {
       return res.status(409).json({
         message:
-          existing.sender === req.user.id
+          String(existing.sender) === req.user.id
             ? 'Friend request already sent'
             : 'This user has already sent you a friend request',
       });
@@ -50,7 +51,9 @@ export const sendFriendRequest = async (req, res) => {
       status: 'accepted',
     });
     if (alreadyFriends) {
-      return res.status(409).json({ message: 'Already friends with this user' });
+      return res
+        .status(409)
+        .json({ message: 'Already friends with this user' });
     }
 
     const request = await FriendRequest.create({
@@ -59,6 +62,17 @@ export const sendFriendRequest = async (req, res) => {
     });
 
     await request.populate('sender receiver', 'username avatar');
+
+    // Notify the receiver
+    createAndSend({
+      userId: receiverId,
+      senderId: req.user.id,
+      type: 'friend_request',
+      title: 'New Friend Request',
+      body: `${request.sender.username} sent you a friend request`,
+    }).catch((err) =>
+      console.error('[NOTIF] friend_request notification failed:', err.message),
+    );
 
     res.status(201).json(request);
   } catch (error) {

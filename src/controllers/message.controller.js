@@ -5,6 +5,7 @@ import {
   deleteFromCloudinary,
 } from '../utils/uploadToCloudinary.js';
 import { getIo } from '../config/socket.js';
+import { createAndSend } from '../services/notification.service.js';
 
 // POST /api/messages
 export const sendMessage = async (req, res) => {
@@ -62,6 +63,25 @@ export const sendMessage = async (req, res) => {
     } catch (e) {
       console.error('[SOCKET] Failed to emit receive_message:', e.message);
     }
+
+    // Send a notification to every chat member except the sender
+    const recipientIds = chat.users
+      .map(String)
+      .filter((id) => id !== req.user.id);
+
+    recipientIds.forEach((recipientId) => {
+      createAndSend({
+        userId: recipientId,
+        senderId: req.user.id,
+        type: 'message',
+        title: message.sender.username,
+        body: message.content
+          ? message.content.slice(0, 100)
+          : '📎 Sent an attachment',
+      }).catch((err) =>
+        console.error('[NOTIF] message notification failed:', err.message),
+      );
+    });
 
     res.status(201).json(message);
   } catch (error) {
